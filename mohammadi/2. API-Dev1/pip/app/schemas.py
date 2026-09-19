@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 
@@ -23,7 +23,7 @@ class RegisterRequest(BaseModel):
     password: str = Field(
         min_length=8,
         max_length=255,
-        examples=["Ali@123456"],
+        examples=["Pass@1234"],
     )
 
 
@@ -32,11 +32,25 @@ class RegisterRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    token_type: str
-    expires_in: int | None
-    role: str = Field(
-        examples=["user", "company", "admin"],
+    refresh_token: str | None = Field(
+        default=None,
     )
+    token_type: str
+    expires_in: int | None = None
+    role: str
+
+
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
 
 
 
@@ -50,8 +64,6 @@ class UserResponse(BaseModel):
     mobile: str
     national_id: str
     created_at: datetime
-
-
 
 
 
@@ -90,6 +102,43 @@ class MyDeviceResponse(BaseModel):
 
 
 
+class HealthResponse(BaseModel):
+    serial: str
+    online: bool
+    last_heartbeat_at: datetime | None = Field(
+        default=None,
+    )
+
+
+
+
+
+class CommandCreate(BaseModel):
+    command_type: Literal["ignite", "switch_off", "locate"] = Field(
+        examples=["locate"],
+    )
+
+
+
+
+
+class CommandResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    device_id: int
+    command_type: str
+    status: str
+    issued_by_role: str
+    issued_by_id: int
+    created_at: datetime
+    delivered_at: datetime | None
+    acknowledged_at: datetime | None
+
+
+
+
+
 class CompanyDeviceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -98,8 +147,6 @@ class CompanyDeviceResponse(BaseModel):
     created_at: datetime
     vehicle_id: int | None = None
     vin: str | None = None
-
-
 
 
 
@@ -155,7 +202,6 @@ class CompanyActivateVehicleRequest(BaseModel):
 
 
 
-
 class VehicleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -166,6 +212,7 @@ class VehicleResponse(BaseModel):
     device_id: int | None
     is_active: bool
     activated_at: datetime | None
+
 
 
 

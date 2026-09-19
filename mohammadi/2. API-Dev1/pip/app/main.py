@@ -20,6 +20,8 @@ from .routers import (
 Base.metadata.create_all(bind=engine)
 
 
+
+
 app = FastAPI(
     title="Rahban API",
     description=(
@@ -30,6 +32,9 @@ app = FastAPI(
 )
 
 
+
+
+
 app.include_router(auth.router)
 app.include_router(devices.router)
 app.include_router(vehicles.router)
@@ -38,9 +43,14 @@ app.include_router(company.router)
 app.include_router(admin.router)
 
 
+
+
+
+
 @app.get(
     "/",
     response_model=RootResponse,
+    tags=["Default"],
 )
 def root():
     return {

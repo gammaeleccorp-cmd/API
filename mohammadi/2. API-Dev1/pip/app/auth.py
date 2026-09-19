@@ -1,23 +1,21 @@
-from datetime import datetime, timedelta, timezone
-
+import hashlib
+import secrets
 import jwt
 from jwt.exceptions import InvalidTokenError
-
+from datetime import datetime, timedelta, timezone
 from fastapi import (
     Depends,
     HTTPException,
     status,
 )
-
 from fastapi.security import OAuth2PasswordBearer
-
 from pwdlib import PasswordHash
-
 from sqlalchemy.orm import Session
-
 from .config import settings
 from .database import get_db
-from .models import Admin, Company, Device, User
+from .models import Admin, Company, Device, User, RefreshToken
+
+
 
 
 
@@ -258,3 +256,120 @@ def get_current_device(
         raise forbidden_exception
 
     return device
+
+
+
+
+
+
+def _hash_refresh_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
+
+
+def issue_refresh_token(db: Session, role: str, subject_id: int) -> str:
+    raw_token = secrets.token_urlsafe(48)
+
+    record = RefreshToken(
+        token_hash=_hash_refresh_token(raw_token),
+        role=role,
+        subject_id=subject_id,
+        expires_at=datetime.now(timezone.utc)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+
+    db.add(record)
+    db.commit()
+
+    return raw_token
+
+
+def rotate_refresh_token(db: Session, raw_token: str) -> tuple[str, str, int]:
+
+    invalid_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired refresh token",
+    )
+
+    token_hash = _hash_refresh_token(raw_token)
+
+    record = (
+        db.query(RefreshToken)
+        .filter(RefreshToken.token_hash == token_hash)
+        .first()
+    )
+
+    if record is None or record.revoked:
+        raise invalid_exception
+
+    if record.expires_at < datetime.now(timezone.utc):
+        raise invalid_exception
+
+    record.revoked = True
+    db.commit()
+
+    if record.role == "user":
+        subject = db.query(User).filter(User.id == record.subject_id).first()
+        username = subject.mobile if subject else None
+    else:
+        subject = db.query(Company).filter(Company.id == record.subject_id).first()
+        username = subject.username if subject else None
+
+    if subject is None:
+        raise invalid_exception
+
+    new_access_token = create_access_token(
+        subject_id=record.subject_id,
+        role=record.role,
+        username=username,
+    )
+
+    new_refresh_token = issue_refresh_token(db, record.role, record.subject_id)
+
+    return new_access_token, new_refresh_token, record.role
+
+
+def revoke_refresh_token(db: Session, raw_token: str) -> None:
+    token_hash = _hash_refresh_token(raw_token)
+
+    record = (
+        db.query(RefreshToken)
+        .filter(RefreshToken.token_hash == token_hash)
+        .first()
+    )
+
+    if record is not None:
+        record.revoked = True
+        db.commit()
+
+
+
+
+def get_current_admin_or_company(
+    payload: dict = Depends(get_token_payload),
+    db: Session = Depends(get_db),
+) -> tuple[str, "Admin | Company"]:
+
+    forbidden_exception = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="This action requires an admin or company account",
+    )
+
+    role = payload.get("role")
+
+    if role not in ("admin", "company"):
+        raise forbidden_exception
+
+    try:
+        subject_id = int(payload["sub"])
+    except (ValueError, TypeError):
+        raise forbidden_exception
+
+    if role == "admin":
+        subject = db.query(Admin).filter(Admin.id == subject_id).first()
+    else:
+        subject = db.query(Company).filter(Company.id == subject_id).first()
+
+    if subject is None:
+        raise forbidden_exception
+
+    return role, subject

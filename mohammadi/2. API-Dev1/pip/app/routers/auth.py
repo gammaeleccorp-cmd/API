@@ -4,29 +4,29 @@ from fastapi import (
     HTTPException,
     status,
 )
-
 from fastapi.security import OAuth2PasswordRequestForm
-
 from sqlalchemy.orm import Session
-
 from ..auth import (
     create_access_token,
     get_current_user,
     hash_password,
+    issue_refresh_token,
+    revoke_refresh_token,
+    rotate_refresh_token,
     verify_password,
 )
-
 from ..config import settings
-
 from ..database import get_db
-
 from ..models import Admin, Company, User
-
 from ..schemas import (
+    LogoutRequest,
+    RefreshRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
 )
+
+
 
 
 
@@ -97,82 +97,87 @@ def register(
 
 
 
-@router.post(
-    "/login",
-    response_model=TokenResponse,
-)
+@router.post("/login", response_model=TokenResponse)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
 
-    admin = (
-        db.query(Admin)
-        .filter(Admin.username == form_data.username)
-        .first()
-    )
-
-    if admin is not None and verify_password(
-        form_data.password, admin.password_hash
-    ):
+    admin = db.query(Admin).filter(Admin.username == form_data.username).first()
+    if admin is not None and verify_password(form_data.password, admin.password_hash):
         access_token = create_access_token(
-            subject_id=admin.id,
-            role="admin",
-            username=admin.username,
-            expire_minutes=settings.ADMIN_TOKEN_EXPIRE_MINUTES,
+            subject_id=admin.id, role="admin", username=admin.username, no_expiry=True,
         )
         return {
             "access_token": access_token,
+            "refresh_token": None,
             "token_type": "bearer",
-            "expires_in": settings.ADMIN_TOKEN_EXPIRE_MINUTES * 60,
+            "expires_in": None,
             "role": "admin",
         }
 
-    company = (
-        db.query(Company)
-        .filter(Company.username == form_data.username)
-        .first()
-    )
-
-    if company is not None and verify_password(
-        form_data.password, company.password_hash
-    ):
+    company = db.query(Company).filter(Company.username == form_data.username).first()
+    if company is not None and verify_password(form_data.password, company.password_hash):
         access_token = create_access_token(
-            subject_id=company.id,
-            role="company",
-            username=company.username,
-            expire_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+            subject_id=company.id, role="company", username=company.username,
         )
+        refresh_token = issue_refresh_token(db, "company", company.id)
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             "role": "company",
         }
 
-    user = (
-        db.query(User)
-        .filter(User.mobile == form_data.username)
-        .first()
-    )
-
-    if user is not None and verify_password(
-        form_data.password, user.password_hash
-    ):
+    user = db.query(User).filter(User.mobile == form_data.username).first()
+    if user is not None and verify_password(form_data.password, user.password_hash):
         access_token = create_access_token(
-            subject_id=user.id,
-            role="user",
-            username=user.mobile,
-            expire_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+            subject_id=user.id, role="user", username=user.mobile,
         )
+        refresh_token = issue_refresh_token(db, "user", user.id)
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             "role": "user",
         }
 
     raise INVALID_CREDENTIALS_EXCEPTION
+
+
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(
+    data: RefreshRequest,
+    db: Session = Depends(get_db),
+):
+
+    new_access_token, new_refresh_token, role = rotate_refresh_token(
+        db, data.refresh_token
+    )
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "role": role,
+    }
+
+
+
+
+
+@router.post("/logout", status_code=204)
+def logout(
+    data: LogoutRequest,
+    db: Session = Depends(get_db),
+):
+    revoke_refresh_token(db, data.refresh_token)
+    return None
 
 
 

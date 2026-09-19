@@ -1,0 +1,26 @@
+[project]
+name = "rahban-uv"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ali-Mhmdi", email = "mohammadiali1380@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.115.0",
+    "pwdlib[argon2]>=0.2.1",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "pyjwt>=2.9.0",
+    "python-multipart>=0.0.12",
+    "sqlalchemy>=2.0.35",
+    "uvicorn[standard]>=0.31.0",
+]
+
+[project.scripts]
+rahban-uv = "rahban_uv:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"

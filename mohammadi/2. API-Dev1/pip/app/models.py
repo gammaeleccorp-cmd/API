@@ -142,6 +142,33 @@ class Company(Base):
 
 
 
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True,
+    )
+
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    subject_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+    )
+
+    revoked: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False,
+    )
+    
+
+
+
+
 class Device(Base):
     __tablename__ = "devices"
 
@@ -194,6 +221,10 @@ class Device(Base):
         uselist=False,
     )
 
+    last_heartbeat_at: Mapped[datetime | None] = mapped_column(
+    DateTime(timezone=True),
+    nullable=True,
+    )
 
 
 
@@ -316,3 +347,61 @@ class Telemetry(Base):
     vehicle: Mapped["Vehicle"] = relationship(
         back_populates="telemetry",
     )
+
+
+
+
+
+class DeviceCommand(Base):
+    __tablename__ = "device_commands"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    device_id: Mapped[int] = mapped_column(
+        ForeignKey("devices.id"),
+        nullable=False,
+        index=True,
+    )
+
+    command_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="pending",
+    )
+
+    issued_by_role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    issued_by_id: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    device: Mapped["Device"] = relationship()
