@@ -1,0 +1,5 @@
+.APIvenv/
+__pycache__/
+*.pyc
+rahban.db
+.env
