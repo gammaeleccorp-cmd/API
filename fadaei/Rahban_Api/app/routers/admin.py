@@ -22,6 +22,7 @@ from ..schemas import (
     CompanyCreate,
     CompanyResponse,
     DeviceResponse,
+    DeviceTokenRevokedResponse,
     VehicleResponse,
 )
 
@@ -172,8 +173,6 @@ def force_deactivate_vehicle(
             detail="Vehicle is not activated",
         )
 
-    vehicle.user_id = None
-    vehicle.company_id = None
     vehicle.device_id = None
     vehicle.is_active = False
 
@@ -195,3 +194,62 @@ def list_all_devices(
     current_admin: Admin = Depends(get_current_admin),
 ):
     return db.query(Device).all()
+
+
+
+
+
+@router.post(
+    "/devices/{serial}/revoke-token",
+    response_model=DeviceTokenRevokedResponse,
+)
+def revoke_device_token(
+    serial: str,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    """
+    The ONLY power an admin has over a device's JWT: revoking it.
+    Admins never mint device tokens themselves - that only happens
+    automatically during activation (see routers/vehicles.py and
+    routers/company.py).
+
+    Bumping token_version instantly invalidates every token issued
+    for this device so far, even though JWTs are otherwise stateless
+    and would keep working until they expire. If the device is
+    currently linked to an active vehicle, that vehicle is also
+    deactivated - a revoked device should not keep sending telemetry
+    under the assumption it's still authorized.
+    """
+
+    device = (
+        db.query(Device)
+        .filter(Device.serial == serial)
+        .first()
+    )
+
+    if device is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    device.token_version += 1
+
+    vehicle = (
+        db.query(Vehicle)
+        .filter(
+            Vehicle.device_id == device.id,
+            Vehicle.is_active == True,
+        )
+        .first()
+    )
+
+    if vehicle is not None:
+        vehicle.device_id = None
+        vehicle.is_active = False
+
+    db.commit()
+    db.refresh(device)
+
+    return {
+        "serial": device.serial,
+        "token_version": device.token_version,
+    }

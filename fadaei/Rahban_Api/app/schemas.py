@@ -109,6 +109,12 @@ class DeviceHealthResponse(BaseModel):
     last_heartbeat_at: datetime | None
 
 
+class DeviceTokenRevokedResponse(BaseModel):
+    serial: str
+    token_version: int
+    message: str = "Device token revoked and vehicle deactivated. Re-activating issues a fresh token."
+
+
 
 
 

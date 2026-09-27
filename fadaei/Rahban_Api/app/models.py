@@ -191,6 +191,17 @@ class Device(Base):
         nullable=True,
     )
 
+    # Bumped whenever an admin revokes this device's token (see
+    # POST /admin/devices/{serial}/revoke-token). Every device token
+    # embeds the token_version it was issued with; a mismatch means
+    # the token has been revoked, even though JWTs are otherwise
+    # stateless and would normally stay valid until they expire.
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+
     owner_user: Mapped["User | None"] = relationship()
     owner_company: Mapped["Company | None"] = relationship()
 

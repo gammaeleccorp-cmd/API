@@ -52,6 +52,7 @@ def create_access_token(
     username: str,
     expire_minutes: int | None = None,
     no_expiry: bool = False,
+    extra_claims: dict | None = None,
 ) -> str:
 
     payload = {
@@ -59,6 +60,9 @@ def create_access_token(
         "role": role,
         "username": username,
     }
+
+    if extra_claims:
+        payload.update(extra_claims)
 
     if not no_expiry:
         if expire_minutes is None:
@@ -312,6 +316,12 @@ def get_current_device(
         detail="This action requires a device token",
     )
 
+    revoked_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Device token has been revoked",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     if payload.get("role") != "device":
         raise forbidden_exception
 
@@ -328,5 +338,8 @@ def get_current_device(
 
     if device is None:
         raise forbidden_exception
+
+    if payload.get("tv") != device.token_version:
+        raise revoked_exception
 
     return device

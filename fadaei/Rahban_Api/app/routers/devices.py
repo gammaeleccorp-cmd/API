@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from ..auth import (
     get_current_command_issuer,
     get_current_device,
-    get_current_owner,
     get_current_owner_or_admin,
     get_current_user,
 )
@@ -247,7 +246,7 @@ def send_heartbeat(
 def get_device_health(
     serial: str,
     db: Session = Depends(get_db),
-    current_owner: tuple = Depends(get_current_owner),
+    current_owner: tuple = Depends(get_current_owner_or_admin),
 ):
 
     role, owner = current_owner
@@ -360,6 +359,12 @@ def acknowledge_command(
 
     if command is None:
         raise HTTPException(status_code=404, detail="Command not found")
+
+    if command.status == "acknowledged":
+        raise HTTPException(
+            status_code=409,
+            detail="Command has already been acknowledged",
+        )
 
     if command.status != "delivered":
         raise HTTPException(

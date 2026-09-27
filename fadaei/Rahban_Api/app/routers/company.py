@@ -156,7 +156,7 @@ def create_vehicle(
             detail="Vehicle with this VIN already exists",
         )
 
-    vehicle = Vehicle(vin=data.vin)
+    vehicle = Vehicle(vin=data.vin, company_id=current_company.id)
 
     db.add(vehicle)
     db.commit()
@@ -188,6 +188,12 @@ def activate_company_vehicle(
         raise HTTPException(
             status_code=404,
             detail="Vehicle not found",
+        )
+
+    if vehicle.company_id != current_company.id:
+        raise HTTPException(
+            status_code=403,
+            detail="This vehicle does not belong to your company",
         )
 
     if vehicle.is_active:
@@ -229,8 +235,6 @@ def activate_company_vehicle(
             detail="Device is already active on another vehicle",
         )
 
-    vehicle.company_id = current_company.id
-    vehicle.user_id = None
     vehicle.device_id = device.id
     vehicle.is_active = True
     vehicle.activated_at = datetime.now(timezone.utc)
@@ -243,6 +247,7 @@ def activate_company_vehicle(
         role="device",
         username=device.serial,
         no_expiry=True,
+        extra_claims={"tv": device.token_version},
     )
 
     return {
@@ -294,7 +299,6 @@ def deactivate_company_vehicle(
             detail="Vehicle is not activated",
         )
 
-    vehicle.company_id = None
     vehicle.device_id = None
     vehicle.is_active = False
 
