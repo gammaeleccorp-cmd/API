@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
@@ -8,24 +7,18 @@ from sqlalchemy import (
     Integer,
     String,
 )
-
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
     relationship,
 )
-
 from .database import Base
-
-
 
 
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
 
 
 
@@ -226,7 +219,11 @@ class Device(Base):
     nullable=True,
     )
 
+    token_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
+
+
+    
 
 class Vehicle(Base):
     __tablename__ = "vehicles"

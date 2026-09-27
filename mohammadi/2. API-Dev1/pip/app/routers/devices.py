@@ -9,6 +9,7 @@ from ..auth import (
     get_current_admin_or_company,
     get_current_device,
     get_current_user,
+    get_current_owner,
 )
 from ..database import get_db
 from ..models import (
@@ -104,6 +105,37 @@ def get_my_devices(
         )
 
     return result
+
+
+
+
+
+@router.post(
+    "/{device_id}/revoke-token",
+    status_code=204,
+)
+def revoke_device_token(
+    device_id: int,
+    db: Session = Depends(get_db),
+    owner: tuple = Depends(get_current_owner),
+):
+    role, owner_obj = owner
+
+    device = db.query(Device).filter(Device.id == device_id).first()
+
+    if device is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    if role == "user" and device.owner_user_id != owner_obj.id:
+        raise HTTPException(status_code=403, detail="You do not own this device")
+
+    if role == "company" and device.owner_company_id != owner_obj.id:
+        raise HTTPException(status_code=403, detail="Your company does not own this device")
+
+    device.token_version += 1
+    db.commit()
+
+    return None
 
 
 

@@ -10,9 +10,9 @@ from ..schemas import TelemetryCreate, TelemetryResponse
 
 
 
+
+
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
-
-
 
 
 

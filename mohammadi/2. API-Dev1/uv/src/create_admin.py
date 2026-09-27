@@ -1,5 +1,5 @@
 """
-    python -m app.create_admin
+    python -m src.create_admin
 """
 
 import getpass

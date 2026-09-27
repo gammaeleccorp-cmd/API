@@ -44,12 +44,14 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 
 
+
 def create_access_token(
     subject_id: int,
     role: str,
     username: str,
     expire_minutes: int | None = None,
     no_expiry: bool = False,
+    extra_claims: dict | None = None,
 ) -> str:
 
     payload = {
@@ -57,6 +59,9 @@ def create_access_token(
         "role": role,
         "username": username,
     }
+
+    if extra_claims:
+        payload.update(extra_claims)
 
     if not no_expiry:
         if expire_minutes is None:
@@ -76,6 +81,8 @@ def create_access_token(
     )
 
     return token
+
+
 
 
 def _decode_token(token: str) -> dict:
@@ -255,9 +262,12 @@ def get_current_device(
     if device is None:
         raise forbidden_exception
 
+    token_version = payload.get("token_version")
+
+    if token_version != device.token_version:
+        raise forbidden_exception
+
     return device
-
-
 
 
 
@@ -301,7 +311,11 @@ def rotate_refresh_token(db: Session, raw_token: str) -> tuple[str, str, int]:
     if record is None or record.revoked:
         raise invalid_exception
 
-    if record.expires_at < datetime.now(timezone.utc):
+    expires_at = record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < datetime.now(timezone.utc):
         raise invalid_exception
 
     record.revoked = True

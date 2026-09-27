@@ -1,5 +1,5 @@
 """
-    python simulate_device.py
+    python src.simulate_device.py
 """
 
 import time

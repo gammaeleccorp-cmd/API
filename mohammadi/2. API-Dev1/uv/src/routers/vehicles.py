@@ -1,22 +1,17 @@
 from datetime import datetime, timezone
-
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
 )
-
 from sqlalchemy.orm import Session
-
 from ..auth import get_current_user, create_access_token
 from ..database import get_db
-
 from ..models import (
     Device,
     User,
     Vehicle,
 )
-
 from ..schemas import (
     ActivateVehicleRequest,
     VehicleActivationResponse,
@@ -124,7 +119,7 @@ def activate_vehicle(
         db.query(Vehicle)
         .filter(
             Vehicle.device_id == device.id,
-            Vehicle.is_active == True,
+            Vehicle.is_active == True,  # noqa: E712
         )
         .first()
     )
@@ -149,6 +144,7 @@ def activate_vehicle(
         role="device",
         username=device.serial,
         no_expiry=True,
+        extra_claims={"token_version": device.token_version},
     )
 
     return {

@@ -1,24 +1,18 @@
-
 from datetime import datetime, timezone
-
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
 )
-
 from sqlalchemy.orm import Session
-
 from ..auth import get_current_company, create_access_token
 from ..database import get_db
-
 from ..models import (
     Company,
     Device,
     Telemetry,
     Vehicle,
 )
-
 from ..schemas import (
     DeviceCreate,
     DeviceResponse,
@@ -41,10 +35,6 @@ router = APIRouter(
     prefix="/company",
     tags=["Company"],
 )
-
-
-
-
 
 
 @router.get(
@@ -156,7 +146,10 @@ def create_vehicle(
             detail="Vehicle with this VIN already exists",
         )
 
-    vehicle = Vehicle(vin=data.vin)
+    vehicle = Vehicle(
+        vin=data.vin,
+        company_id=current_company.id,
+    )
 
     db.add(vehicle)
     db.commit()
@@ -165,7 +158,7 @@ def create_vehicle(
     return vehicle
 
 
-
+    
 
 
 @router.post(
@@ -188,6 +181,12 @@ def activate_company_vehicle(
         raise HTTPException(
             status_code=404,
             detail="Vehicle not found",
+        )
+
+    if vehicle.company_id is not None and vehicle.company_id != current_company.id:
+        raise HTTPException(
+            status_code=403,
+            detail="This vehicle belongs to another company",
         )
 
     if vehicle.is_active:
@@ -218,7 +217,7 @@ def activate_company_vehicle(
         db.query(Vehicle)
         .filter(
             Vehicle.device_id == device.id,
-            Vehicle.is_active == True,
+            Vehicle.is_active == True,  # noqa: E712
         )
         .first()
     )
@@ -235,6 +234,12 @@ def activate_company_vehicle(
     vehicle.is_active = True
     vehicle.activated_at = datetime.now(timezone.utc)
 
+    if vehicle.company_id is not None and vehicle.company_id != current_company.id:
+        raise HTTPException(
+            status_code=403,
+            detail="This vehicle belongs to another company",
+            )
+
     db.commit()
     db.refresh(vehicle)
 
@@ -243,6 +248,7 @@ def activate_company_vehicle(
         role="device",
         username=device.serial,
         no_expiry=True,
+        extra_claims={"token_version": device.token_version},
     )
 
     return {
