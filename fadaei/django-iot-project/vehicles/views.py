@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from vehicles.models import Vehicle
+from vehicles.serializers import VehicleSerializer
 from devices.permissions import IsVehicleOwner
 
 
@@ -12,16 +13,12 @@ class VehicleListView(APIView):
     def get(self, request):
         vehicles = Vehicle.objects.filter(owner=request.user)
 
-        return Response([
-            {
-                "id": vehicle.id,
-                "name": vehicle.name,
-                "brand": vehicle.brand,
-                "model": vehicle.model,
-                "vin": vehicle.vin,
-            }
-            for vehicle in vehicles
-        ])
+        serializer = VehicleSerializer(
+            vehicles,
+            many=True
+        )
+
+        return Response(serializer.data)
 
 
 class VehicleDetailView(APIView):
@@ -38,10 +35,6 @@ class VehicleDetailView(APIView):
 
         self.check_object_permissions(request, vehicle)
 
-        return Response({
-            "id": vehicle.id,
-            "name": vehicle.name,
-            "brand": vehicle.brand,
-            "model": vehicle.model,
-            "vin": vehicle.vin,
-        })
+        serializer = VehicleSerializer(vehicle)
+
+        return Response(serializer.data)

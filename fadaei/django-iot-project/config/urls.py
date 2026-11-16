@@ -33,6 +33,8 @@ urlpatterns = [
     path("api/devices/", include("devices.urls")),
     path("api/vehicles/", include("vehicles.urls")),
     path("api/notes/", include("notes.urls")),
+    path("api/accounts/", include("accounts.urls")),
+    path("api/telemetry/", include("telemetry.urls")),
 
     # API Documentation
     path(
